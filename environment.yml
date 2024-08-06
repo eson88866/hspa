@@ -1,4 +1,4 @@
-name: carla
+name: hspa
 channels:
   - pytorch
   - conda-forge
@@ -157,8 +157,6 @@ dependencies:
   - python=3.7.8=h6f2ec95_0_cpython
   - python-dateutil=2.8.1=py_0
   - python_abi=3.7=1_cp37m
-  - pytorch=1.4.0=py3.7_cuda10.1.243_cudnn7.6.3_0
-  - pytorch-lightning=1.0.3=py_1
   - pytz=2020.1=py_0
   - pyyaml=5.3.1=py37h8f50634_0
   - pyzmq=19.0.1=py37he6710b0_1
@@ -185,7 +183,6 @@ dependencies:
   - termcolor=1.1.0=py37_1
   - tk=8.6.10=hbc83047_0
   - toml=0.10.1=py_0
-  - torchvision=0.5.0=py37_cu101
   - tornado=6.0.4=py37h7b6447c_1
   - tqdm=4.48.2=pyh9f0ad1d_0
   - traitlets=4.3.3=py37_0

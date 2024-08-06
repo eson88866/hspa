@@ -1,4 +1,5 @@
 import numpy as np
+import math 
 import carla
 from gym import spaces
 import cv2 as cv
@@ -23,6 +24,7 @@ COLOR_WHITE = (255, 255, 255)
 COLOR_ALUMINIUM_0 = (238, 238, 236)
 COLOR_ALUMINIUM_3 = (136, 138, 133)
 COLOR_ALUMINIUM_5 = (46, 52, 54)
+COLOR_PURPLE = (138, 43, 226)###
 
 
 def tint(color, factor):
@@ -44,11 +46,18 @@ class ObsManager(ObsManagerBase):
         self._history_idx = obs_configs['history_idx']
         self._scale_bbox = obs_configs.get('scale_bbox', True)
         self._scale_mask_col = obs_configs.get('scale_mask_col', 1.1)
-
+        ###
+        self._frame_rate = 20    #1sec=20frames
+        self._extrapolation_seconds = int(obs_configs['extrapolation_seconds'])
+        self._future_idx = obs_configs['future_idx']
+        self._number_of_future_frames = self._extrapolation_seconds * self._frame_rate
+        self._vehicle_model = EgoModel(dt=(1.0 / self._frame_rate))
+        self._vehicle_futures = []
+        ###
         self._history_queue = deque(maxlen=20)
 
         self._image_channels = 3
-        self._masks_channels = 3 + 3*len(self._history_idx)
+        self._masks_channels = 3 + 3*len(self._history_idx) + len(self._future_idx) #15>21
         self._parent_actor = None
         self._world = None
 
@@ -115,6 +124,14 @@ class ObsManager(ObsManagerBase):
                 and abs(ev_loc.z - w.location.z) < 8.0
             c_ev = abs(ev_loc.x - w.location.x) < 1.0 and abs(ev_loc.y - w.location.y) < 1.0
             return c_distance and (not c_ev)
+        
+        def is_within_distance_vehicle(veh):###
+            w = veh.get_transform()
+            c_distance = abs(ev_loc.x - w.location.x) < self._distance_threshold \
+                and abs(ev_loc.y - w.location.y) < self._distance_threshold \
+                and abs(ev_loc.z - w.location.z) < 8.0
+            c_ev = abs(ev_loc.x - w.location.x) < 1.0 and abs(ev_loc.y - w.location.y) < 1.0
+            return c_distance and (not c_ev)
 
         vehicle_bbox_list = self._world.get_level_bbs(carla.CityObjectLabel.Vehicles)
         walker_bbox_list = self._world.get_level_bbs(carla.CityObjectLabel.Pedestrians)
@@ -137,6 +154,18 @@ class ObsManager(ObsManagerBase):
         # objects with history
         vehicle_masks, walker_masks, tl_green_masks, tl_yellow_masks, tl_red_masks, stop_masks \
             = self._get_history_masks(M_warp)
+        
+        ###
+        actors = self._world.get_actors()
+        vehicle_actor_list = actors.filter('*vehicle*')
+        if self._scale_bbox:
+            vehicle_futures = self._get_vehicle_futures(vehicle_actor_list, is_within_distance_vehicle, 1.0)
+        else:
+            vehicle_futures = self._get_vehicle_futures(vehicle_actor_list, is_within_distance_vehicle)
+        
+        self._vehicle_futures = vehicle_futures
+        vehicle_future_masks = self._get_future_masks(M_warp)
+        ###
 
         # road_mask, lane_mask
         road_mask = cv.warpAffine(self._road, M_warp, (self._width, self._width)).astype(np.bool)
@@ -165,6 +194,7 @@ class ObsManager(ObsManagerBase):
         image[lane_mask_broken] = COLOR_MAGENTA_2
 
         h_len = len(self._history_idx)-1
+        f_len = len(self._future_idx)-1###
         for i, mask in enumerate(stop_masks):
             image[mask] = tint(COLOR_YELLOW_2, (h_len-i)*0.2)
         for i, mask in enumerate(tl_green_masks):
@@ -174,6 +204,8 @@ class ObsManager(ObsManagerBase):
         for i, mask in enumerate(tl_red_masks):
             image[mask] = tint(COLOR_RED, (h_len-i)*0.2)
 
+        for i, mask in enumerate(vehicle_future_masks):###
+            image[mask] = tint(COLOR_PURPLE, (f_len-i)*0.2)
         for i, mask in enumerate(vehicle_masks):
             image[mask] = tint(COLOR_BLUE, (h_len-i)*0.2)
         for i, mask in enumerate(walker_masks):
@@ -201,7 +233,9 @@ class ObsManager(ObsManagerBase):
         c_vehicle_history = [m*255 for m in vehicle_masks]
         c_walker_history = [m*255 for m in walker_masks]
 
-        masks = np.stack((c_road, c_route, c_lane, *c_vehicle_history, *c_walker_history, *c_tl_history), axis=2)
+        c_vehicle_future = [m*255 for m in vehicle_future_masks]###
+
+        masks = np.stack((c_road, c_route, c_lane, *c_vehicle_history, *c_walker_history, *c_tl_history, *c_vehicle_future), axis=2)
         masks = np.transpose(masks, [2, 0, 1])
 
         obs_dict = {'rendered': image, 'masks': masks}
@@ -209,6 +243,96 @@ class ObsManager(ObsManagerBase):
         self._parent_actor.collision_px = np.any(ev_mask_col & walker_masks[-1])
 
         return obs_dict
+    
+    def _get_vehicle_futures(self, vehicle_list, criteria, scale=None):###
+        """
+        Get the future bounding boxes of nearby vehicles.
+
+        Args:
+            vehicle_list (list): List of nearby vehicles.
+            criteria (function): Function to determine if a vehicle is nearby.
+            scale (float, optional): Scale factor for bounding box extent. Defaults to None.
+
+        Returns:
+            list: List of future bounding boxes of nearby vehicles.
+        """
+
+        # Dictionary to store nearby vehicles and their future bounding boxes
+        nearby_vehicles = {}
+
+        # Iterate over nearby vehicles
+        for vehicle in vehicle_list:
+            is_within_distance = criteria(vehicle)
+
+            # If the vehicle is within the specified distance
+            if is_within_distance:
+                veh_future_bbs = []  # List to store future bounding boxes of the vehicle
+                traffic_transform = vehicle.get_transform()  # Get the transform of the vehicle
+                traffic_control = vehicle.get_control()  # Get the control of the vehicle
+                traffic_velocity = vehicle.get_velocity()  # Get the velocity of the vehicle
+                traffic_speed = self._get_forward_speed(
+                    transform=traffic_transform, velocity=traffic_velocity)  # Calculate the forward speed
+
+                next_loc = np.array([traffic_transform.location.x, traffic_transform.location.y])  # Get the next location
+                action = np.array(np.stack([traffic_control.steer, traffic_control.throttle, traffic_control.brake], axis=-1))  # Get the action
+                next_yaw = np.array([traffic_transform.rotation.yaw / 180.0 * np.pi])  # Get the next yaw
+                next_speed = np.array([traffic_speed])  # Get the next speed
+
+                # Iterate over the number of future frames
+                for i in range(self._number_of_future_frames):
+                    # Predict the next location, yaw and speed of the vehicle
+                    next_loc, next_yaw, next_speed = self._vehicle_model.forward(next_loc, next_yaw, next_speed, action)
+
+                    # Calculate the delta yaws
+                    delta_yaws = next_yaw.item() * 180.0 / np.pi
+
+                    # Create the transform and bounding box of the vehicle at the next frame
+                    transform = carla.Transform(carla.Location(x=next_loc[0].item(), y=next_loc[1].item(), z=traffic_transform.location.z))
+                    bounding_box = carla.BoundingBox(transform.location, vehicle.bounding_box.extent)
+                    bounding_box.rotation = carla.Rotation(pitch=float(traffic_transform.rotation.pitch),
+                                                        yaw=float(delta_yaws),
+                                                        roll=float(traffic_transform.rotation.roll))
+
+                    bb_loc = carla.Location()
+                    bb_ext = carla.Vector3D(bounding_box.extent)
+
+                    # Scale the bounding box extent if scale is provided
+                    if scale is not None:
+                        bb_ext = bb_ext * scale
+                        bb_ext.x = max(bb_ext.x, 0.8)
+                        bb_ext.y = max(bb_ext.y, 0.8)
+
+                    # Append the transformed bounding box to the list
+                    veh_future_bbs.append((carla.Transform(bounding_box.location, bounding_box.rotation), bb_loc, bb_ext))
+
+                # Add the vehicle and its future bounding boxes to the dictionary
+                nearby_vehicles[vehicle.id] = veh_future_bbs
+
+        # List to store the future bounding boxes of nearby vehicles
+        vehicle_futures = []
+
+        # Iterate over the future indices
+        for idx in self._future_idx:
+            # Clip the index to the range of future frames
+            idx = np.clip(idx, 1, self._number_of_future_frames)
+            future_at_idx = []  # List to store the future bounding boxes at the current index
+
+            # Iterate over the nearby vehicles
+            for k, v in nearby_vehicles.items():
+                # Append the future bounding box at the current index to the list
+                future_at_idx.append(v[idx - 1])
+
+            # Append the list of future bounding boxes to the list of future bounding boxes
+            vehicle_futures.append((future_at_idx))
+
+        # Return the list of future bounding boxes of nearby vehicles
+        return vehicle_futures
+
+    def _get_future_masks(self, M_warp):###
+        vehicle_masks = []
+        for future in self._vehicle_futures:
+            vehicle_masks.append(self._get_mask_from_actor_list(future, M_warp))
+        return vehicle_masks
 
     def _get_history_masks(self, M_warp):
         qsize = len(self._history_queue)
@@ -302,7 +426,80 @@ class ObsManager(ObsManagerBase):
         """Converts the world units to pixel units"""
         return self._pixels_per_meter * width
 
+    def _get_forward_speed(self, transform, velocity):###
+        """
+        Convert the vehicle transform directly to forward speed.
+
+        Args:
+            transform (carla.Transform): The vehicle transform.
+            velocity (carla.Vector3D): The vehicle velocity.
+
+        Returns:
+            float: The vehicle forward speed.
+        """
+        # Convert the velocity to numpy array
+        vel_np = np.array([velocity.x, velocity.y, velocity.z])
+
+        # Calculate the pitch and yaw in radians
+        pitch = np.deg2rad(transform.rotation.pitch)
+        yaw = np.deg2rad(transform.rotation.yaw)
+
+        # Calculate the orientation vector in Cartesian coordinates
+        orientation = np.array([
+            np.cos(pitch) * np.cos(yaw),
+            np.cos(pitch) * np.sin(yaw),
+            np.sin(pitch)
+        ])
+
+        # Calculate the forward speed by dot product of velocity and orientation
+        speed = np.dot(vel_np, orientation)
+
+        return speed
+
     def clean(self):
         self._parent_actor = None
         self._world = None
+        self._vehicle_futures = []###
         self._history_queue.clear()
+
+
+class EgoModel():###
+    def __init__(self, dt=1. / 4):
+        self.dt = dt
+
+        # Kinematic bicycle model. Numbers are the tuned parameters from World on Rails
+        self.front_wb = -0.090769015
+        self.rear_wb = 1.4178275
+
+        self.steer_gain = 0.36848336
+        self.brake_accel = -4.952399
+        self.throt_accel = 0.5633837
+
+
+    def forward(self, locs, yaws, spds, acts):
+        # Kinematic bicycle model. Numbers are the tuned parameters from World on Rails
+        steer = acts[..., 0:1].item()
+        throt = acts[..., 1:2].item()
+        brake = acts[..., 2:3].astype(np.uint8)
+
+        if (brake):
+            accel = self.brake_accel
+        else:
+            accel = self.throt_accel * throt
+
+        wheel = self.steer_gain * steer
+
+        beta = math.atan(self.rear_wb / (self.front_wb + self.rear_wb) * math.tan(wheel))
+        yaws = yaws.item()
+        spds = spds.item()
+        next_locs_0 = locs[0].item() + spds * math.cos(yaws + beta) * self.dt
+        next_locs_1 = locs[1].item() + spds * math.sin(yaws + beta) * self.dt
+        next_yaws = yaws + spds / self.rear_wb * math.sin(beta) * self.dt
+        next_spds = spds + accel * self.dt
+        next_spds = next_spds * (next_spds > 0.0)  # Fast ReLU
+
+        next_locs = np.array([next_locs_0, next_locs_1])
+        next_yaws = np.array(next_yaws)
+        next_spds = np.array(next_spds)
+
+        return next_locs, next_yaws, next_spds

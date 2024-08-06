@@ -46,7 +46,10 @@ class ObsManager(ObsManagerBase):
                 dtype=np.int8),
              'lane_id': spaces.Box(
                 low=-20, high=20, shape=(self._max_detection_number, 1),
-                dtype=np.int8)})
+                dtype=np.int8),
+            'control': spaces.Box(
+                low=0, high=1, shape=(self._max_detection_number, 4),
+                dtype=np.float32)})
 
     def attach_ego_vehicle(self, parent_actor):
         self._parent_actor = parent_actor
@@ -66,12 +69,13 @@ class ObsManager(ObsManagerBase):
             if has_different_id and is_within_distance:
                 surrounding_vehicles.append(vehicle)
 
-        sorted_surrounding_vehicles = sorted(surrounding_vehicles, key=dist_to_ev)
+        sorted_surrounding_vehicles = sorted(surrounding_vehicles, key=dist_to_ev)##
 
         location, rotation, absolute_velocity = trans_utils.get_loc_rot_vel_in_ev(
             sorted_surrounding_vehicles, ev_transform)
 
         binary_mask, extent, road_id, lane_id = [], [], [], []
+        controls= []###
         for sv in sorted_surrounding_vehicles[:self._max_detection_number]:
             binary_mask.append(1)
 
@@ -83,6 +87,11 @@ class ObsManager(ObsManagerBase):
             road_id.append(wp.road_id)
             lane_id.append(wp.lane_id)
 
+            control = sv.get_control()
+            controls.append([
+                control.throttle, control.steer, control.brake, control.hand_brake
+            ])
+
         for i in range(self._max_detection_number - len(binary_mask)):
             binary_mask.append(0)
             location.append([0, 0, 0])
@@ -91,6 +100,7 @@ class ObsManager(ObsManagerBase):
             absolute_velocity.append([0, 0, 0])
             road_id.append(0)
             lane_id.append(0)
+            controls.append([0, 0, 0, 0])
 
         obs_dict = {
             'frame': self._world.get_snapshot().frame,
@@ -100,7 +110,8 @@ class ObsManager(ObsManagerBase):
             'extent': np.array(extent, dtype=np.float32),
             'absolute_velocity': np.array(absolute_velocity, dtype=np.float32),
             'road_id': np.array(road_id, dtype=np.int8),
-            'lane_id': np.array(lane_id, dtype=np.int8)
+            'lane_id': np.array(lane_id, dtype=np.int8),
+            'control': np.array(controls, dtype=np.float32)
         }
         return obs_dict
 

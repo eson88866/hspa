@@ -37,8 +37,10 @@ class ObsManager(ObsManagerBase):
         ev_transform = self._parent_actor.vehicle.get_transform()
 
         route_plan = self._parent_actor.route_plan
+        # route_plan = self._parent_actor.route_plan[0:20]
 
         route_length = len(route_plan)
+        # print("route_length:",route_length)
         location_list = []
         command_list = []
         road_id = []

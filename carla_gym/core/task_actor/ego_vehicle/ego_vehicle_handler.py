@@ -95,8 +95,9 @@ class EgoVehicleHandler(object):
             info = info_criteria.copy()
             done, timeout, terminal_reward, terminal_debug = self.terminal_handlers[ev_id].get(timestamp)
             reward, reward_debug = self.reward_handlers[ev_id].get(terminal_reward)
+            # r = [r_speed, r_position, r_rotation, terminal_reward, r_steer, r_brake]
 
-            reward_dict[ev_id] = reward
+            reward_dict[ev_id] = reward###every one step
             done_dict[ev_id] = done
             info_dict[ev_id] = info
             info_dict[ev_id]['timeout'] = timeout
@@ -104,7 +105,7 @@ class EgoVehicleHandler(object):
             info_dict[ev_id]['terminal_debug'] = terminal_debug
 
             # accumulate into buffers
-            self.reward_buffers[ev_id].append(reward)
+            self.reward_buffers[ev_id].append(np.sum(reward))###every epoch rewards sum (* envs)
 
             if info['collision']:
                 if info['collision']['collision_type'] == 0:

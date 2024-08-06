@@ -6,5 +6,5 @@ ppo:
   env_wrapper:
     entry_point: agents.rl_birdview.utils.rl_birdview_wrapper:RlBirdviewWrapper
     kwargs:
-      input_states: [control, vel_xy]
+      input_states: [control, vel_xy, speed_limit ]
       acc_as_action: True

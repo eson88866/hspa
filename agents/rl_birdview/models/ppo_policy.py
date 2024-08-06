@@ -108,7 +108,14 @@ class PpoPolicy(nn.Module):
         :param state: th.Tensor (num_envs, state_dim)
         """
         birdview = birdview.float() / 255.0
+        # print('----------------------------------')
+        # print(birdview)
+        # print('----------------------------------')
+        # print(state)
+        # print('----------------------------------')
         features = self.features_extractor(birdview, state)
+        # print(features)
+        # print('----------------------------------')
         return features
 
     def _get_action_dist_from_features(self, features: th.Tensor):
@@ -141,13 +148,22 @@ class PpoPolicy(nn.Module):
         values = self.value_head(features)
         distribution, mu, sigma = self._get_action_dist_from_features(features)
         return values.flatten(), distribution.distribution
-
+    
+    def print_key(self,**test):
+        for key, value in test.items():
+            print(f"Key: {key}, Value: {value}")
+    
     def forward(self, obs_dict: Dict[str, np.ndarray], deterministic: bool = False, clip_action: bool = False):
         '''
         used in collect_rollouts(), do not clamp actions
         '''
         with th.no_grad():
             obs_tensor_dict = dict([(k, th.as_tensor(v).to(self.device)) for k, v in obs_dict.items()])
+            #print('obs_tensor_dict')
+            # 打印出obs_tensor_dict的键
+            # for key in obs_dict.keys():
+            #     print(key)
+            #self.print_key(**obs_dict)
             features = self._get_features(**obs_tensor_dict)
             values = self.value_head(features)
             distribution, mu, sigma = self._get_action_dist_from_features(features)

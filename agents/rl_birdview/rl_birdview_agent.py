@@ -45,6 +45,7 @@ class RlBirdviewAgent():
 
         # prepare policy
         self._policy_class = load_entry_point(cfg['policy']['entry_point'])
+        #agents.rl_birdview.models.ppo_policy:PpoPolicy
         self._policy_kwargs = cfg['policy']['kwargs']
         if self._ckpt is None:
             self._policy = None
@@ -56,8 +57,13 @@ class RlBirdviewAgent():
         self._wrapper_class = load_entry_point(cfg['env_wrapper']['entry_point'])
         self._wrapper_kwargs = cfg['env_wrapper']['kwargs']
 
+
     def run_step(self, input_data, timestamp):
         input_data = copy.deepcopy(input_data)
+    
+        # for key in input_data.keys():
+        #      print(key)
+        #print(self._wrapper_kwargs['input_states'])
 
         policy_input = self._wrapper_class.process_obs(input_data, self._wrapper_kwargs['input_states'], train=False)
 
@@ -102,7 +108,8 @@ class RlBirdviewAgent():
             self._policy = self._policy_class(env.observation_space, env.action_space, **self._policy_kwargs)
 
         # init ppo model
-        model_class = load_entry_point(self._train_cfg['entry_point'])
+        model_class = load_entry_point(self._train_cfg['entry_point']) 
+        #config_agent.yaml.training.entry_point = agents.rl_birdview.models.ppo:PPO
         model = model_class(self._policy, env, **self._train_cfg['kwargs'])
         model.learn(total_timesteps, callback=callback, seed=seed)
 

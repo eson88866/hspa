@@ -26,18 +26,18 @@ def main(cfg: DictConfig):
     server_manager.start()
 
     # prepare agent
-    agent_name = cfg.actors[cfg.ev_id].agent
+    agent_name = cfg.actors[cfg.ev_id].agent #=ppo
 
     last_checkpoint_path = Path(hydra.utils.get_original_cwd()) / 'outputs' / 'checkpoint.txt'
     if last_checkpoint_path.exists():
         with open(last_checkpoint_path, 'r') as f:
-            cfg.agent[agent_name].wb_run_path = f.read()
+            cfg.agent[agent_name].wb_run_path = f.read() #config.agent.ppo.yaml
 
     OmegaConf.save(config=cfg.agent[agent_name], f='config_agent.yaml')
 
     # single agent
-    AgentClass = config_utils.load_entry_point(cfg.agent[agent_name].entry_point)
-    agent = AgentClass('config_agent.yaml')
+    AgentClass = config_utils.load_entry_point(cfg.agent[agent_name].entry_point) #=agents.rl_birdview.rl_birdview_agent:RlBirdviewAgent
+    agent = AgentClass('config_agent.yaml') #=RlBirdviewAgent()
     cfg_agent = OmegaConf.load('config_agent.yaml')
 
     obs_configs = {cfg.ev_id: OmegaConf.to_container(cfg_agent.obs_configs)}
@@ -46,12 +46,14 @@ def main(cfg: DictConfig):
 
     # env wrapper
     EnvWrapper = config_utils.load_entry_point(cfg_agent.env_wrapper.entry_point)
+    #=agents.rl_birdview.utils.rl_birdview_wrapper:RlBirdviewWrapper
     wrapper_kargs = cfg_agent.env_wrapper.kwargs
 
     config_utils.check_h5_maps(cfg.train_envs, obs_configs, cfg.carla_sh_path)
 
     def env_maker(config):
         log.info(f'making port {config["port"]}')
+        # gym.make: /home/t2503/anaconda3/envs/roach/lib/python3.7/site-packages/gym/envs/registration.py
         env = gym.make(config['env_id'], obs_configs=obs_configs, reward_configs=reward_configs,
                        terminal_configs=terminal_configs, host='localhost', port=config['port'],
                        seed=cfg.seed, no_rendering=True, **config['env_configs'])

@@ -32,7 +32,7 @@ class PpoBufferSamples(NamedTuple):
     exploration_suggests: List[tuple]
 
 
-class PpoBuffer():
+class PpoBuffer():#buffer_size=n_steps=2048
     def __init__(self, buffer_size: int, observation_space: spaces.Space, action_space: spaces.Space,
                  gae_lambda: float = 1, gamma: float = 0.99, n_envs: int = 1):
 
@@ -60,6 +60,7 @@ class PpoBuffer():
         # int(np.prod(self.action_space.shape))
         self.actions = np.zeros((self.buffer_size, self.n_envs)+self.action_space.shape, dtype=np.float32)
         self.rewards = np.zeros((self.buffer_size, self.n_envs), dtype=np.float32)
+        # self.rewards = np.zeros((self.buffer_size, self.n_envs,6), dtype=np.float32)###
         self.returns = np.zeros((self.buffer_size, self.n_envs), dtype=np.float32)
         self.advantages = np.zeros((self.buffer_size, self.n_envs), dtype=np.float32)
         self.dones = np.zeros((self.buffer_size, self.n_envs), dtype=np.float32)
@@ -91,7 +92,6 @@ class PpoBuffer():
             delta = self.rewards[step] + self.gamma * next_value * next_non_terminal - self.values[step]
             last_gae_lam = delta + self.gamma * self.gae_lambda * next_non_terminal * last_gae_lam
             self.advantages[step] = last_gae_lam
-
         # sb3 return
         self.returns = self.advantages + self.values
 
@@ -135,6 +135,8 @@ class PpoBuffer():
             obs_dict = {}
             for k in self.observations.keys():
                 obs_dict[k] = self.observations[k][i]
+                #print('obs_dict[k]')
+                print(obs_dict[k])
             values = policy.forward_value(obs_dict)
             self.values[i] = values
 
@@ -197,7 +199,7 @@ class PpoBuffer():
         list_render = []
 
         _, _, c, h, w = self.observations['birdview'].shape
-        vis_idx = np.array([0, 1, 2, 6, 10, 14])
+        vis_idx = np.array([0, 1, 2, 6, 10, 14])###[0, 1, 2, 6, 10, 14]
 
         for i in range(self.buffer_size):
             im_envs = []

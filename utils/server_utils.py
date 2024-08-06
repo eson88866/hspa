@@ -17,7 +17,7 @@ def kill_carla():
 
 class CarlaServerManager():
     def __init__(self, carla_sh_str, port=2000, configs=None, t_sleep=5):
-        self._carla_sh_str = carla_sh_str
+        self._carla_sh_str = carla_sh_str #carla_sh_path=${CARLA_ROOT}/CarlaUE4.sh
         # self._root_save_dir = root_save_dir
         self._t_sleep = t_sleep
         self.env_configs = []
@@ -41,8 +41,9 @@ class CarlaServerManager():
         kill_carla()
         for cfg in self.env_configs:
             cmd = f'CUDA_VISIBLE_DEVICES={cfg["gpu"]} bash {self._carla_sh_str} ' \
-                f'-fps=10 -quality-level=Epic -carla-rpc-port={cfg["port"]}'
-            #     f'-fps=10 -carla-server -opengl -carla-rpc-port={cfg["port"]}'
+                f'-fps=20 -carla-server -opengl -carla-rpc-port={cfg["port"]}'
+            #    f'-fps=10 -quality-level=Epic -carla-rpc-port={cfg["port"]}'
+                
             log.info(cmd)
             # log_file = self._root_save_dir / f'server_{cfg["port"]}.log'
             # server_process = subprocess.Popen(cmd, shell=True, preexec_fn=os.setsid, stdout=open(log_file, "w"))

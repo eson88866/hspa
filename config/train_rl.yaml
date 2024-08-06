@@ -3,7 +3,7 @@ defaults:
   - agent/ppo/policy: xtma_beta
   - agent/ppo/training: ppo
   - agent/ppo/obs_configs: birdview
-  - train_envs: endless_all
+  - train_envs: endless_nowalker
 actors:
   hero:
     agent: ppo

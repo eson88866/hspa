@@ -9,6 +9,9 @@ from stable_baselines3.common.callbacks import BaseCallback
 from stable_baselines3.common.utils import explained_variance
 
 from .ppo_buffer import PpoBuffer
+from AutomaticWeightedLoss import AutomaticWeightedLoss
+from torch import optim
+import os
 
 
 class PPO():
@@ -34,7 +37,7 @@ class PPO():
         self.env = env
         self.learning_rate = learning_rate
         self.n_steps_total = n_steps_total
-        self.n_steps = n_steps_total//env.num_envs
+        self.n_steps = n_steps_total//env.num_envs#every emv need collect step =12288/6=2048 step
         self.batch_size = batch_size
         self.n_epochs = n_epochs
         self.gamma = gamma
@@ -73,14 +76,14 @@ class PPO():
         self.mu_statistics = []
         self.sigma_statistics = []
 
-        while n_steps < n_rollout_steps:
+        while n_steps < n_rollout_steps:#12288/6=2048
             actions, values, log_probs, mu, sigma, _ = self.policy.forward(self._last_obs)
             self.action_statistics.append(actions)
             self.mu_statistics.append(mu)
             self.sigma_statistics.append(sigma)
 
             new_obs, rewards, dones, infos = env.step(actions)
-
+                      
             if callback.on_step() is False:
                 return False
 
@@ -91,13 +94,13 @@ class PPO():
             n_steps += 1
             self.num_timesteps += env.num_envs
 
+            # reward_of_envs
             rollout_buffer.add(self._last_obs, actions, rewards, self._last_dones, values, log_probs, mu, sigma, infos)
             self._last_obs = new_obs
             self._last_dones = dones
 
         last_values = self.policy.forward_value(self._last_obs)
         rollout_buffer.compute_returns_and_advantage(last_values, dones=self._last_dones)
-
         return True
 
     def train(self):
@@ -182,7 +185,7 @@ class PPO():
                 if self.lr_schedule_step is not None:
                     self.kl_early_stop += 1
                     if self.kl_early_stop >= self.lr_schedule_step:
-                        self.learning_rate *= 0.5
+                        self.learning_rate *= 0.5###
                         self.kl_early_stop = 0
                 break
 
@@ -207,6 +210,11 @@ class PPO():
             "train/clip_range": self.clip_range,
             "train/train_epoch": epoch,
             "train/learning_rate": self.learning_rate
+            # "train/weight_r_speed":
+            # "train/weight_r_speed":
+            # "train/weight_r_speed":
+            # "train/weight_r_speed":
+            # "train/weight_r_speed":
         }
 
     def learn(self, total_timesteps, callback=None, seed=2021):
@@ -231,7 +239,7 @@ class PPO():
         while self.num_timesteps < total_timesteps:
             callback.on_rollout_start()
             t0 = time.time()
-            self.policy = self.policy.train()
+            self.policy = self.policy.train() #training mode
             continue_training = self.collect_rollouts(self.env, callback, self.buffer, self.n_steps)
             self.t_rollout = time.time() - t0
             callback.on_rollout_end()

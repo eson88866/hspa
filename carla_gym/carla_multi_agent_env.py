@@ -15,6 +15,7 @@ from stable_baselines3.common.utils import set_random_seed
 logger = logging.getLogger(__name__)
 
 
+
 class CarlaMultiAgentEnv(gym.Env):
     def __init__(self, carla_map, host, port, seed, no_rendering,
                  obs_configs, reward_configs, terminal_configs, all_tasks):
@@ -106,7 +107,7 @@ class CarlaMultiAgentEnv(gym.Env):
         obs_dict = self._om_handler.get_observation(self.timestamp)
         return obs_dict
 
-    def step(self, control_dict):
+    def step(self, control_dict):###
         self._ev_handler.apply_control(control_dict)
         self._sa_handler.tick()
         # tick world
@@ -154,6 +155,7 @@ class CarlaMultiAgentEnv(gym.Env):
         self.set_sync_mode(True)
         self.set_no_rendering_mode(self._world, no_rendering)
 
+        self._tm.global_percentage_speed_difference(30) ###30*0.80=24.0
         # self._tm.set_hybrid_physics_mode(True)
 
         # self._tm.set_global_distance_to_leading_vehicle(5.0)

@@ -1,10 +1,12 @@
 # @package _group_
 birdview:
   module: birdview.chauffeurnet
-  width_in_pixels: 192
+  width_in_pixels: 222
   pixels_ev_to_bottom: 40
   pixels_per_meter: 5.0
-  history_idx: [-16, -11, -6, -1]
+  history_idx: [-16, -11, -6, -1] #[-16, -11, -6, -1]
+  extrapolation_seconds: 3
+  future_idx: [61, 51, 41, 31, 21, 11] #[16, 11, 6, 1]
   scale_bbox: true
   scale_mask_col: 1.0
 speed:

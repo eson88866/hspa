@@ -11,13 +11,21 @@ eval_num_zombie_vehicles = {
     'Town05': 120,
     'Town06': 120
 }
+# eval_num_zombie_walkers = {
+#     'Town01': 120,
+#     'Town02': 70,
+#     'Town03': 70,
+#     'Town04': 80,
+#     'Town05': 120,
+#     'Town06': 80
+# }
 eval_num_zombie_walkers = {
-    'Town01': 120,
-    'Town02': 70,
-    'Town03': 70,
-    'Town04': 80,
-    'Town05': 120,
-    'Town06': 80
+    'Town01': 0,
+    'Town02': 0,
+    'Town03': 0,
+    'Town04': 0,
+    'Town05': 0,
+    'Town06': 0
 }
 
 class RlBirdviewWrapper(gym.Wrapper):
@@ -93,7 +101,7 @@ class RlBirdviewWrapper(gym.Wrapper):
             'start_simulation_time': snap_shot.timestamp.elapsed_seconds
         }
 
-        obs = self.process_obs(obs_ma[self._ev_id], self._input_states)
+        obs = self.process_obs(obs_ma[self._ev_id], self._input_states, 0.0)###
 
         self._render_dict['prev_obs'] = obs
         self._render_dict['prev_im_render'] = obs_ma[self._ev_id]['birdview']['rendered']
@@ -101,11 +109,14 @@ class RlBirdviewWrapper(gym.Wrapper):
 
     def step(self, action):
         action_ma = {self._ev_id: self.process_act(action, self._acc_as_action)}
-
         obs_ma, reward_ma, done_ma, info_ma = self.env.step(action_ma)
 
-        obs = self.process_obs(obs_ma[self._ev_id], self._input_states)
+        maxs_text = next(text for text in info_ma['hero']['reward_debug']['debug_texts'] if 'maxs:' in text)
+        maxs_value = float(maxs_text.split('maxs:')[1].strip())
+
+        obs = self.process_obs(obs_ma[self._ev_id], self._input_states, maxs_value)###
         reward = reward_ma[self._ev_id]
+
         done = done_ma[self._ev_id]
         info = info_ma[self._ev_id]
 
@@ -158,13 +169,14 @@ class RlBirdviewWrapper(gym.Wrapper):
         return im
 
     @staticmethod
-    def process_obs(obs, input_states, train=True):
+    def process_obs(obs, input_states, maxs_value, train=True):
 
         state_list = []
         if 'speed' in input_states:
             state_list.append(obs['speed']['speed_xy'])
         if 'speed_limit' in input_states:
-            state_list.append(obs['control']['speed_limit'])
+            # state_list.append(obs['control']['speed_limit'])
+            state_list.append(np.array([maxs_value], dtype=np.float32))###
         if 'control' in input_states:
             state_list.append(obs['control']['throttle'])
             state_list.append(obs['control']['steer'])
@@ -178,8 +190,13 @@ class RlBirdviewWrapper(gym.Wrapper):
             state_list.append(obs['velocity']['vel_ang_z'])
 
         state = np.concatenate(state_list)
+        # print('###state###')
+        # print(state_list)
+        #print(state)
 
         birdview = obs['birdview']['masks']
+        #print('###birdview###')
+        #print(birdview)
 
         if not train:
             birdview = np.expand_dims(birdview, 0)
