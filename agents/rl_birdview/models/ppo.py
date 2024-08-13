@@ -9,7 +9,7 @@ from stable_baselines3.common.callbacks import BaseCallback
 from stable_baselines3.common.utils import explained_variance
 
 from .ppo_buffer import PpoBuffer
-from AutomaticWeightedLoss import AutomaticWeightedLoss
+# from AutomaticWeightedLoss import AutomaticWeightedLoss
 from torch import optim
 import os
 
