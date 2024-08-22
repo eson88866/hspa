@@ -115,7 +115,7 @@ class ValeoAction(object):
                 dist_fu = max(0.0, np.linalg.norm(future_hazard_loc[0:2]) - 8.0)
     
                 # Calculate desired speed for future hazard
-                desired_spd_fu = round(dist_fu * 4.0 / 3.6, 3)
+                desired_spd_fu = dist_fu
 
         # If the location of the maximum curvature is None, then the curvature is also set to None.
         curvature, cur_spd, curve_loc = curve_speed(waypoint_plan)
@@ -123,20 +123,20 @@ class ValeoAction(object):
         if curve_loc is not None:
             # Calculate the distance to the maximum curvature
             dist_cur = max(0.0, np.linalg.norm(curve_loc) - 1.0)
-            slow_before_cur = round(dist_cur * 3.5 / 3.6, 3) + cur_spd
+            slow_before_cur = dist_cur + cur_spd
 
         if hazard_vehicle_loc is not None:
             dist_veh = max(0.0, np.linalg.norm(hazard_vehicle_loc[0:2])-8.0)
-            desired_spd_veh = round(dist_veh * 3.5 / 3.6, 3)
+            desired_spd_veh = dist_veh
 
         # if hazard_ped_loc is not None:
         #     dist_ped = max(0.0, np.linalg.norm(hazard_ped_loc[0:2])-9.0) #6
         #     # desired_spd_ped = _maxium_speed * np.clip(dist_ped, 0.0, 5.0)/5.0 #self._maxium_speed
-        #     desired_spd_ped = round(dist_ped * 4.0 / 3.6, 2)
+        #     desired_spd_ped = dist_ped
 
         if (light_state == carla.TrafficLightState.Red or light_state == carla.TrafficLightState.Yellow):
             dist_rl = max(0.0, np.linalg.norm(light_loc[0:2])-8.0)#5
-            desired_spd_rl = round(dist_rl * 3.5 / 3.6, 3)
+            desired_spd_rl = dist_rl
 
         # stop sign
         stop_sign = self._ego_vehicle.criteria_stop._target_stop_sign
@@ -148,7 +148,7 @@ class ValeoAction(object):
             loc_in_ev = trans_utils.loc_global_to_ref(loc_in_world, ev_transform)
             stop_loc = np.array([loc_in_ev.x, loc_in_ev.y, loc_in_ev.z], dtype=np.float32)
             dist_stop = max(0.0, np.linalg.norm(stop_loc[0:2])-6.0)
-            desired_spd_stop = round(dist_stop * 3.5 / 3.6, 2)
+            desired_spd_stop = dist_stop
 
         desired_speed = min(_maxium_speed, desired_spd_veh, desired_spd_rl, slow_before_cur, desired_spd_stop, desired_spd_fu)###desired_spd_ped
 

@@ -46,7 +46,7 @@ training:
     lr_schedule_step: 8
 obs_configs:
   birdview:
-    module: birdview.chauffeurnet_19b
+    module: birdview.chauffeurnet_21b
     width_in_pixels: 222
     pixels_ev_to_bottom: 40
     pixels_per_meter: 5.0
